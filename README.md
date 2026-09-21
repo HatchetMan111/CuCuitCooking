@@ -57,11 +57,17 @@ CUICUIT_SUPABASE_SERVICE_KEY=eyJ... \
 bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/CuCuitCooking/main/install/cuicuit.sh)"
 ```
 
-Optionale Keys (LLM/Scraper, werden in die Container-`.env` übernommen):
+Optionale Keys (LLM/Scraper/Stripe, werden in die Container-`.env` übernommen):
 
 ```bash
 MISTRAL_API_KEY=... GROQ_API_KEY=... LLM_PRIORITY=mistral,groq bash cuicuit.sh --ctid 101
 ```
+
+Hinweis: `SUPABASE_SECRET_KEY` (Admin-Key, nutzt Upstream in `hooks.server.ts`,
+steht nicht in deren `.env.example`) und `PUBLIC_SUPABASE_URL_CLOUD`
+(Bild-URLs, Fallback ist die lokale URL) setzt der Installer automatisch auf
+die lokalen Werte; `STRIPE_SECRET_KEY` bleibt leer (Build ok, Billing zur
+Laufzeit deaktiviert), solange kein Key per Host-Env mitgegeben wird.
 
 Das Skript (`set -euo pipefail`, idempotent):
 1. prüft Host/Tools, nimmt die nächste freie CT-ID,

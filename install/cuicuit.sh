@@ -56,8 +56,8 @@ EXT_SUPABASE_URL="${CUICUIT_SUPABASE_URL:-${SUPABASE_URL:-}}"
 EXT_ANON_KEY="${CUICUIT_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-}}"
 EXT_SERVICE_KEY="${CUICUIT_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY:-}}"
 
-# Optionale LLM-/Scraper-Keys werden 1:1 in die Container-.env uebernommen (leere bleiben leer):
-FWD_ENV_KEYS="MISTRAL_API_KEY MISTRAL_MODEL GROQ_API_KEY GROQ_MODEL LLM_PRIORITY PYTHON_SCRAPER_URL PYTHON_SCRAPER_KEY"
+# Optionale LLM-/Scraper-/Stripe-Keys werden 1:1 in die Container-.env uebernommen (leere bleiben leer):
+FWD_ENV_KEYS="MISTRAL_API_KEY MISTRAL_MODEL GROQ_API_KEY GROQ_MODEL LLM_PRIORITY PYTHON_SCRAPER_URL PYTHON_SCRAPER_KEY STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY"
 
 DEBUG="${DEBUG:-0}"
 LOG_FILE="/tmp/${APP}-install-$(date +%F-%H%M%S).log"
@@ -575,6 +575,15 @@ wanted = {
     "PUBLIC_SUPABASE_URL": url,
     "PUBLIC_SUPABASE_PUBLISHABLE_KEY": anon,
     "SUPABASE_SERVICE_ROLE_KEY": service,
+    # Upstream benennt inkonsistent: src/hooks.server.ts nutzt SUPABASE_SECRET_KEY
+    # als Admin-Key (steht nicht in .env.example) -> gleicher Service-Role-Wert.
+    # $env/static/private muss zur BUILD-Zeit definiert sein, sonst faellt vite build.
+    "SUPABASE_SECRET_KEY": service,
+    # RecipeImage.svelte nutzt CLOUD primaer, LOCAL als Fallback -> self-host: beide lokal.
+    "PUBLIC_SUPABASE_URL_CLOUD": url,
+    # billing/checkout.ts importiert STRIPE_SECRET_KEY statisch (Build-Pflicht);
+    # leer = Build ok, Billing zur Laufzeit deaktiviert (Host-Env kann spaeter fuellen).
+    "STRIPE_SECRET_KEY": "",
 }
 lines, seen = [], set()
 with open(path) as f:
