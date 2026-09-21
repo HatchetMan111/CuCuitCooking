@@ -457,7 +457,7 @@ mkdir -p "\$APP_DIR"
 chown "\$SERVICE_USER:\$SERVICE_USER" "\$APP_DIR"
 
 echo "[LXC] Repo-Stand sichern (idempotent: fetch + reset auf origin/\$BRANCH) ..."
-if [[ ! -d "\$APP_DIR/.git" ]]; then
+fresh_clone() {
   if [[ -d "\$APP_DIR" && -n "\$(ls -A "\$APP_DIR")" ]]; then
     # \$APP_DIR ist das Home von \$SERVICE_USER und enthaelt Skelett-Dateien
     # (.bashrc, .profile) – git clone braucht ein leeres Ziel: Umweg via Temp-Dir.
@@ -469,14 +469,28 @@ if [[ ! -d "\$APP_DIR/.git" ]]; then
   else
     runuser -u "\$SERVICE_USER" -- git clone --branch "\$BRANCH" --depth 1 "https://github.com/\$GITHUB_REPO.git" "\$APP_DIR"
   fi
+}
+# Das Repo gehoert \$SERVICE_USER – alle git-Ops laufen als er (sonst
+# "fatal: detected dubious ownership" fuer root). safe.directory zusaetzlich
+# als Gurt fuer direkte root-Zugriffe (z. B. Debugging per pct exec).
+runuser -u "\$SERVICE_USER" -- git config --global --add safe.directory "\$APP_DIR" 2>/dev/null || true
+git config --global --add safe.directory "\$APP_DIR" 2>/dev/null || true
+if [[ -d "\$APP_DIR/.git" ]]; then
+  if runuser -u "\$SERVICE_USER" -- git -C "\$APP_DIR" fetch origin --prune \
+  && runuser -u "\$SERVICE_USER" -- git -C "\$APP_DIR" reset --hard "origin/\$BRANCH"; then
+    echo "[LXC] Repo aktualisiert."
+  else
+    echo "[LXC][WARN] Repo-Update schlug fehl – frischer Clone (.env/Marker bleiben erhalten)."
+    rm -rf "\$APP_DIR/.git"
+    fresh_clone
+  fi
 else
-  git -C "\$APP_DIR" fetch origin --prune
-  git -C "\$APP_DIR" reset --hard "origin/\$BRANCH"
-  # Hinweis: bewusst KEIN "git clean -fdx" – das wuerde .env, .use-local-supabase
-  # und .proxmox-build-rev loeschen. reset --hard revertiert den Adapter-Patch
-  # (svelte.config.js ist tracked), der Patch weiter unten laeuft erneut.
+  fresh_clone
 fi
-NEW_REV="\$(git -C "\$APP_DIR" rev-parse HEAD)"
+# Hinweis: bewusst KEIN "git clean -fdx" – das wuerde .env, .use-local-supabase
+# und .proxmox-build-rev loeschen. reset --hard revertiert den Adapter-Patch
+# (svelte.config.js ist tracked), der Patch weiter unten laeuft erneut.
+NEW_REV="\$(runuser -u "\$SERVICE_USER" -- git -C "\$APP_DIR" rev-parse HEAD)"
 echo "[LXC] Repo-Rev: \$NEW_REV"
 chown -R "\$SERVICE_USER:\$SERVICE_USER" "\$APP_DIR"
 
