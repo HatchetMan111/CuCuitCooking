@@ -1,0 +1,29 @@
+[Unit]
+Description=Cuicuit - Kitchen Companion (SvelteKit, self-hosted)
+Documentation=https://github.com/MadeInPierre/cuicuit
+After=network-online.target cuicuit-supabase.service
+Wants=network-online.target cuicuit-supabase.service
+
+[Service]
+Type=simple
+User=cuicuit
+Group=cuicuit
+WorkingDirectory=/opt/cuicuit
+EnvironmentFile=/opt/cuicuit/.env
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=3000
+ExecStart=/usr/bin/node /opt/cuicuit/build
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

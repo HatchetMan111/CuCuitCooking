@@ -1,0 +1,16 @@
+[Unit]
+Description=Cuicuit Supabase stack (lokal, via Supabase CLI)
+Documentation=https://github.com/MadeInPierre/cuicuit
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/cuicuit
+ExecStart=/usr/local/bin/cuicuit-supabase-start
+ExecStop=/usr/bin/npx --yes supabase stop
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target
