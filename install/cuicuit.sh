@@ -656,6 +656,42 @@ else
   echo "[LXC] svelte.config.js bereits auf adapter-node (idempotent)."
 fi
 
+echo "[LXC] Stripe-Client lazy patchen (top-level new Stripe('') crasht Build+Start ohne Key) ..."
+CHECKOUT_TS="src/lib/core/operations/billing/checkout.ts"
+if grep -q "Proxmox self-host patch: Stripe-Client lazy" "\$CHECKOUT_TS" 2>/dev/null; then
+  echo "[LXC] checkout.ts bereits gepatcht (idempotent)."
+elif grep -q "const stripe = new Stripe(STRIPE_SECRET_KEY" "\$CHECKOUT_TS" 2>/dev/null; then
+  cp "\$CHECKOUT_TS" "\$CHECKOUT_TS.proxmox-bak"
+  python3 - <<'PYEOF'
+p = "src/lib/core/operations/billing/checkout.ts"
+s = open(p).read()
+old_init = "const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' });"
+assert s.count(old_init) == 1, "Stripe-Init-Zeile nicht (genau 1x) gefunden"
+new_init = (
+    "// Proxmox self-host patch: Stripe-Client lazy (idempotent).\n"
+    "// Top-level new Stripe mit leerem Key crasht sonst vite build (postbuild-analyse\n"
+    "// importiert das Modul) und jeden Server-Start ohne konfigurierten Key.\n"
+    "let stripe: Stripe | null = null;\n"
+    "function getStripe(): Stripe {\n"
+    "\tif (!stripe) {\n"
+    "\t\tif (!STRIPE_SECRET_KEY) throw new OpError('INTERNAL', 'Billing ist nicht konfiguriert (STRIPE_SECRET_KEY fehlt).');\n"
+    "\t\tstripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' });\n"
+    "\t}\n"
+    "\treturn stripe;\n"
+    "}"
+)
+s = s.replace(old_init, new_init)
+old_use = "await stripe.checkout.sessions.create(sessionPayload);"
+assert s.count(old_use) == 1, "Stripe-Verwendung nicht (genau 1x) gefunden"
+s = s.replace(old_use, "await getStripe().checkout.sessions.create(sessionPayload);")
+open(p, "w").write(s)
+print("[LXC] checkout.ts gepatcht (Backup: checkout.ts.proxmox-bak).")
+PYEOF
+  grep -q "function getStripe" "\$CHECKOUT_TS" || { echo "[LXC][ERROR] Stripe-Patch fehlgeschlagen." >&2; exit 1; }
+else
+  echo "[LXC][WARN] checkout.ts enthaelt weder Marker noch bekannte Stripe-Init-Zeile – Upstream hat die Datei geaendert, Patch uebersprungen."
+fi
+
 echo "[LXC] Build entscheiden (nur bei neuer Rev / fehlendem build/ – idempotent) ..."
 OLD_REV="\$(cat "\$APP_DIR/.proxmox-build-rev" 2>/dev/null || true)"
 NEED_BUILD=0
