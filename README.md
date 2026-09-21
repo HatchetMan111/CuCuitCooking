@@ -105,7 +105,32 @@ Erwartete Schlussausgabe (Beispiel):
 ══════════════════════════════════════════════════════════
 ```
 
-## 2. Reboot-Test (Reboot-sicher belegen)
+## 2. Erste Anmeldung (wichtig – bitte lesen)
+
+**Sofort nutzbar, ganz ohne E-Mail:** Upstreams Dev-Seed legt einen
+fertigen Demo-Account an (vorbestätigt, inkl. Demo-Rezepte + 100 Credits):
+
+- E-Mail: `dev@cuicuit.app`
+- Passwort: `1SouffleAuFromage`
+
+Einfach auf `http://<LXC-IP>:3000` damit einloggen. Der Account ist öffentlich
+dokumentiert (Upstream-Seed) — für den Dauerbetrieb eigenen Account
+registrieren und den Dev-Account in Studio (`http://<LXC-IP>:54323`) löschen.
+
+**Eigene Registrierung:** geht direkt, **ohne** E-Mail-Bestätigung. Hintergrund:
+lokale Mails werden nie echt verschickt, sondern landen in Inbucket
+(`http://<LXC-IP>:54324`); Upstreams Default (`enable_confirmations = true`
++ `site_url localhost:5173`) würde jede Registrierung blockieren. Der Installer
+setzt daher `site_url` auf die Container-IP und schaltet die Bestätigung aus
+(Homelab-Standard; wer will, kann es in `supabase/config.toml` zurückdrehen).
+
+- Passwort vergessen? Reset-Link kommt per Inbucket-Mail (`:54324` öffnen,
+  Link anklicken).
+- Bereits registrierte, aber **unbestätigte** Nutzer (aus älteren Läufen):
+  Bestätigungslink aus Inbucket öffnen — oder Nutzer in Studio löschen und
+  neu registrieren.
+
+## 3. Reboot-Test (Reboot-sicher belegen)
 
 Der Supabase-Stack braucht nach einem Reboot 30–60 s (Docker + Postgres +
 Kong starten gestaffelt; `cuicuit.service` wartet via
@@ -120,7 +145,7 @@ curl -fs http://$(pct exec $CT -- ip -4 -o addr show eth0 | awk '{print $4}' | c
 pct config $CT | grep -i onboot                                # muss: onboot: 1
 ```
 
-## 3. Update (idempotent – einfach erneut laufen lassen)
+## 4. Update (idempotent – einfach erneut laufen lassen)
 
 ```bash
 bash cuicuit.sh --ctid 100
@@ -144,13 +169,13 @@ die zur Build-Zeit eingebettet werden):
 pct exec 100 -- bash -c 'BUILD_FORCE=1 bash /tmp/cuicuit-setup.sh'
 ```
 
-## 4. Deinstallation
+## 5. Deinstallation
 
 ```bash
 pct stop 100 && pct destroy 100
 ```
 
-## 5. Debugging (komplette Fehlermeldungskette)
+## 6. Debugging (komplette Fehlermeldungskette)
 
 - Jeder Lauf loggt **stdout+stderr vollständig** nach `/tmp/cuicuit-install-<Datum>.log`.
 - Bei Fehlern druckt das Skript: Befehl, Zeile, Exit-Code, Stacktrace
@@ -167,7 +192,7 @@ pct exec 100 -- journalctl -u cuicuit --no-pager -n 100
 pct exec 100 -- journalctl -u cuicuit-supabase --no-pager -n 50
 ```
 
-## 6. Dateien in diesem Paket
+## 7. Dateien in diesem Paket
 
 ```text
 cuicuit-proxmox/                    # dieses Paket: NUR Proxmox-Installer, kein App-Code
@@ -180,7 +205,7 @@ cuicuit-proxmox/                    # dieses Paket: NUR Proxmox-Installer, kein 
 `install/cuicuit.sh` bettet beide Unit-Vorlagen ein, damit der Einzeiler
 ohne weitere Dateien auskommt.
 
-## 7. Hinweise
+## 8. Hinweise
 
 - **Warum LXC statt VM:** nichts Kernel-/GPU-spezifisches — Node + Docker
   laufen in unprivilegierten LXC mit `nesting=1`. Keine VM nötig.

@@ -523,6 +523,7 @@ else
   touch "\$APP_DIR/.use-local-supabase"
   chown "\$SERVICE_USER:\$SERVICE_USER" "\$APP_DIR/.use-local-supabase"
   cd "\$APP_DIR"
+  CFG_BEFORE="\$(sha256sum supabase/config.toml | cut -d' ' -f1)"
   echo "[LXC] Analytics/Vector deaktivieren (Logflare wird in LXC nie healthy, die App braucht es nicht) ..."
   python3 - <<'PYEOF'
 import re
@@ -543,6 +544,41 @@ assert mm and re.search(r'(?m)^enabled\s*=\s*false', mm.group(0)), 'analytics-Pa
 open(p, 'w').write(s)
 print('[LXC] [analytics] enabled = false gesetzt.')
 PYEOF
+  echo "[LXC] Auth fuer Self-Host konfigurieren (site_url auf Container-IP, keine Mail-Bestaetigung) ..."
+  SITE_URL="http://\$LXC_IP:\$APP_PORT"
+  python3 - "\$SITE_URL" <<'PYEOF'
+import re, sys
+site = sys.argv[1]
+p = "supabase/config.toml"
+s = open(p).read()
+def patch_section(text, header, key, newline):
+    pat = r'(?m)^\[' + re.escape(header) + r'\].*?(?=^\[|\Z)'
+    m = re.search(pat, text, flags=re.S)
+    assert m, 'Sektion [%s] nicht gefunden' % header
+    def fix(mo):
+        sec = mo.group(0)
+        newsec, n = re.subn(r'(?m)^' + re.escape(key) + r'\s*=.*$', newline, sec)
+        assert n == 1, 'Key %s nicht (genau 1x) in [%s]' % (key, header)
+        return newsec
+    return re.sub(pat, fix, text, flags=re.S, count=1)
+# Upstream-Defaults zeigen auf localhost:5173 (Dev) – Bestaetigungs-/Reset-Links
+# waeren vom Nutzer-PC aus tot. Self-host: Container-IP + App-Port.
+s = patch_section(s, 'auth', 'site_url', 'site_url = "%s"' % site)
+s = patch_section(s, 'auth', 'additional_redirect_urls',
+                  'additional_redirect_urls = ["%s", "%s/**"]' % (site, site))
+# Registrierung ohne E-Mail-Bestaetigung: lokale Mails landen nur in Inbucket
+# (Port 54324) und kaemen nie echt an – Login waere unmoeglich. Homelab: aus.
+s = patch_section(s, 'auth.email', 'enable_confirmations', 'enable_confirmations = false')
+open(p, 'w').write(s)
+print('auth-Patch ok: site_url gesetzt, email-Bestaetigung aus.')
+PYEOF
+  CFG_AFTER="\$(sha256sum supabase/config.toml | cut -d' ' -f1)"
+  if [[ "\$CFG_BEFORE" != "\$CFG_AFTER" ]]; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^supabase_'; then
+      echo "[LXC] Supabase-Config geaendert – Stack wird neu gestartet (GoTrue uebernimmt site_url) ..."
+      npx --yes supabase stop
+    fi
+  fi
   # idempotent: laeuft der Stack schon, meldet die CLI "started" und exit 0
   npx --yes supabase start
   echo "[LXC] Supabase-Status + Keys auslesen ..."
@@ -819,6 +855,11 @@ echo -e "  Datenbank    : lokal im LXC (Supabase-Stack, Studio: http://${CT_IP:-
 fi
 if [[ "$CREATED_NOW" == "1" && "$GENERATED_PW" == "1" ]]; then
 echo -e "  Root-Passwort: ${C_BOLD}${ROOT_PASSWORD}${C_RESET} (nur jetzt angezeigt – sicher ablegen!)"
+fi
+echo -e "  Login        : ${C_BOLD}dev@cuicuit.app / 1SouffleAuFromage${C_RESET} (Demo-Account aus Upstream-Seed, inkl. Demo-Rezepte)"
+echo -e "  Registrieren : eigene E-Mail geht ohne Bestaetigung (E-Mail-Versand ist lokal deaktiviert)"
+if [[ "$USE_EXTERNAL" != "1" ]]; then
+echo -e "  Mailbox      : http://${CT_IP:-<LXC-IP>}:54324 (Inbucket – faengt Passwort-Reset-Mails; Best.-Links unbest. Alt-Nutzer)"
 fi
 echo -e "  Service      : systemctl status ${APP}  (im Container via: pct enter ${CTID})"
 echo -e "  Update       : Skript erneut laufen lassen (idempotent) – pullt Branch '${BRANCH}', baut bei Aenderung neu"
