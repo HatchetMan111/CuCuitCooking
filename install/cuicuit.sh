@@ -577,7 +577,10 @@ wanted = {
     "SUPABASE_SERVICE_ROLE_KEY": service,
     # Upstream benennt inkonsistent: src/hooks.server.ts nutzt SUPABASE_SECRET_KEY
     # als Admin-Key (steht nicht in .env.example) -> gleicher Service-Role-Wert.
-    # $env/static/private muss zur BUILD-Zeit definiert sein, sonst faellt vite build.
+    # HINWEIS: \$env hier bewusst escaped – der aeussere Heredoc expandiert jedes
+    # unescapte $ sofort auf dem Host (set -u -> Abbruch). Gleiches gilt fuer
+    # $ in Python-Regexen ausserhalb von Quotes – unbedingt pruefen!
+    # \$env/static/private muss zur BUILD-Zeit definiert sein, sonst faellt vite build.
     "SUPABASE_SECRET_KEY": service,
     # RecipeImage.svelte nutzt CLOUD primaer, LOCAL als Fallback -> self-host: beide lokal.
     "PUBLIC_SUPABASE_URL_CLOUD": url,
