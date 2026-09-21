@@ -107,28 +107,72 @@ Erwartete Schlussausgabe (Beispiel):
 
 ## 2. Erste Anmeldung (wichtig – bitte lesen)
 
-**Sofort nutzbar, ganz ohne E-Mail:** Upstreams Dev-Seed legt einen
-fertigen Demo-Account an (vorbestätigt, inkl. Demo-Rezepte + 100 Credits):
+> **Kurzfassung:** E-Mail-Bestätigung gibt es hier nicht — du kannst dich
+> sofort einloggen oder registrieren. Echte E-Mails verschickt das System
+> keine (siehe „Warum kam keine E-Mail?").
 
-- E-Mail: `dev@cuicuit.app`
-- Passwort: `1SouffleAuFromage`
+### Weg A: Demo-Account (30 Sekunden, empfohlen zum Ausprobieren)
 
-Einfach auf `http://<LXC-IP>:3000` damit einloggen. Der Account ist öffentlich
-dokumentiert (Upstream-Seed) — für den Dauerbetrieb eigenen Account
-registrieren und den Dev-Account in Studio (`http://<LXC-IP>:54323`) löschen.
+Upstreams Dev-Seed legt einen fertigen, vorbestätigten Account an —
+inkl. 4 Demo-Rezepten und 100 Credits:
 
-**Eigene Registrierung:** geht direkt, **ohne** E-Mail-Bestätigung. Hintergrund:
-lokale Mails werden nie echt verschickt, sondern landen in Inbucket
-(`http://<LXC-IP>:54324`); Upstreams Default (`enable_confirmations = true`
-+ `site_url localhost:5173`) würde jede Registrierung blockieren. Der Installer
-setzt daher `site_url` auf die Container-IP und schaltet die Bestätigung aus
-(Homelab-Standard; wer will, kann es in `supabase/config.toml` zurückdrehen).
+1. Browser öffnen: `http://<LXC-IP>:3000` (IP steht in der Schlussausgabe
+   des Installers, z. B. `http://192.168.1.100:3000`)
+2. Einloggen mit:
+   - E-Mail: `dev@cuicuit.app`
+   - Passwort: `1SouffleAuFromage`
+3. Fertig — Rezepte, Essensplan und Einkaufsliste sind direkt nutzbar.
 
-- Passwort vergessen? Reset-Link kommt per Inbucket-Mail (`:54324` öffnen,
-  Link anklicken).
-- Bereits registrierte, aber **unbestätigte** Nutzer (aus älteren Läufen):
-  Bestätigungslink aus Inbucket öffnen — oder Nutzer in Studio löschen und
-  neu registrieren.
+> Das Passwort steht öffentlich in Upstreams Repo. Für den Dauerbetrieb:
+> eigenen Account registrieren (Weg B) und danach den Dev-Account löschen —
+> in Studio (`http://<LXC-IP>:54323`) unter **Authentication → Users →
+> `dev@cuicuit.app` → Delete user**.
+
+### Weg B: Eigener Account (ohne E-Mail-Bestätigung)
+
+1. Auf `http://<LXC-IP>:3000` auf **Registrieren/Sign up** klicken
+2. E-Mail + Passwort (min. 6 Zeichen) eingeben, absenden
+3. **Kein Bestätigungslink nötig** — direkt einloggen und loslegen
+
+Dass das ohne Bestätigung geht, ist Absicht (der Installer schaltet
+`enable_confirmations` aus, siehe unten). Google-Login daneben
+funktioniert **nicht** — der Button braucht Upstreams echte OAuth-Secrets,
+die lokal leer sind. Einfach ignorieren und E-Mail + Passwort nutzen.
+
+### Warum kam keine E-Mail? (Hintergrund, einmal verstehen)
+
+- Lokal läuft **kein echter Mailserver**. Alle Mails (Bestätigung,
+  Passwort-Reset) fängt **Inbucket** ab, ein Postfach zum Reinschauen:
+  `http://<LXC-IP>:54324`. Was du dort siehst, wäre „draußen" nie angekommen.
+- Upstreams Standard (`enable_confirmations = true`, `site_url localhost:5173`)
+  würde damit **jede** Registrierung blockieren — und selbst der
+  Inbucket-Link wäre tot (zeigt auf `localhost`). Der Installer setzt daher
+  `site_url` auf die Container-IP (+ Redirect-URLs) und schaltet die
+  Pflicht-Bestätigung aus. Wer sie zurückwill:
+  in `/opt/cuicuit/supabase/config.toml` (`pct enter <CT>`) unter
+  `[auth.email]` auf `true` stellen und Installer erneut laufen lassen
+  (startet den Stack neu) — dann aber Bestätigungslinks aus Inbucket (`:54324`)
+  öffnen.
+- **Echte Mails** (für echten SMTP-Versand) sind Handarbeit: in derselben
+  Datei `[auth.email.smtp]` auskommentieren/ausfüllen (bleibt bei Re-Runs
+  erhalten, der Installer fasst nur einzelne Keys an), Installer erneut
+  laufen lassen.
+
+### Passwort vergessen?
+
+1. Auf der Login-Seite **Passwort vergessen** klicken, E-Mail eingeben
+2. Inbucket öffnen: `http://<LXC-IP>:54324` → neueste Mail öffnen
+3. Reset-Link anklicken (zeigt dank `site_url`-Patch auf die Container-IP,
+   funktioniert also vom PC aus), neues Passwort setzen
+
+### Probleme & Lösungen
+
+| Symptom | Ursache / Lösung |
+|---|---|
+| `Email not confirmed` beim Login | Account aus einem **alten** Lauf (noch mit Bestätigungspflicht). Link aus Inbucket (`:54324`) öffnen — oder Nutzer in Studio (`:54323` → Authentication → Users) löschen und neu registrieren |
+| Bestätigungs-/Reset-Link zeigt auf `localhost` | Alter Stack-Stand: Installer erneut laufen lassen (patcht `site_url` neu + Stack-Restart). Danach **neue** Mail anfordern — alte Links bleiben kaputt |
+| Google-Login schlägt fehl | Erwartet: keine lokalen OAuth-Secrets. E-Mail + Passwort nutzen |
+| `dev@cuicuit.app` existiert nach Neuinstallation nicht | Nur wenn der Seed beim Erststart lief. Bei übernommenen/älteren DBs fehlt er ggf. — dann Weg B nutzen |
 
 ## 3. Reboot-Test (Reboot-sicher belegen)
 
