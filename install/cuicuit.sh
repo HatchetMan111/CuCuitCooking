@@ -458,7 +458,17 @@ chown "\$SERVICE_USER:\$SERVICE_USER" "\$APP_DIR"
 
 echo "[LXC] Repo-Stand sichern (idempotent: fetch + reset auf origin/\$BRANCH) ..."
 if [[ ! -d "\$APP_DIR/.git" ]]; then
-  runuser -u "\$SERVICE_USER" -- git clone --branch "\$BRANCH" --depth 1 "https://github.com/\$GITHUB_REPO.git" "\$APP_DIR"
+  if [[ -d "\$APP_DIR" && -n "\$(ls -A "\$APP_DIR")" ]]; then
+    # \$APP_DIR ist das Home von \$SERVICE_USER und enthaelt Skelett-Dateien
+    # (.bashrc, .profile) – git clone braucht ein leeres Ziel: Umweg via Temp-Dir.
+    TMP_CLONE="\$(mktemp -d)"
+    chown "\$SERVICE_USER:\$SERVICE_USER" "\$TMP_CLONE"
+    runuser -u "\$SERVICE_USER" -- git clone --branch "\$BRANCH" --depth 1 "https://github.com/\$GITHUB_REPO.git" "\$TMP_CLONE"
+    cp -a "\$TMP_CLONE/." "\$APP_DIR/"
+    rm -rf "\$TMP_CLONE"
+  else
+    runuser -u "\$SERVICE_USER" -- git clone --branch "\$BRANCH" --depth 1 "https://github.com/\$GITHUB_REPO.git" "\$APP_DIR"
+  fi
 else
   git -C "\$APP_DIR" fetch origin --prune
   git -C "\$APP_DIR" reset --hard "origin/\$BRANCH"
