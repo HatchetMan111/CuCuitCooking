@@ -523,6 +523,26 @@ else
   touch "\$APP_DIR/.use-local-supabase"
   chown "\$SERVICE_USER:\$SERVICE_USER" "\$APP_DIR/.use-local-supabase"
   cd "\$APP_DIR"
+  echo "[LXC] Analytics/Vector deaktivieren (Logflare wird in LXC nie healthy, die App braucht es nicht) ..."
+  python3 - <<'PYEOF'
+import re
+p = "supabase/config.toml"
+s = open(p).read()
+m = re.search(r'(?m)^\[analytics\]\s*$', s)
+if m:
+    def fix_sec(mo):
+        sec = mo.group(0)
+        if re.search(r'(?m)^enabled\s*=', sec):
+            return re.sub(r'(?m)^enabled\s*=.*$', 'enabled = false', sec)
+        return sec.rstrip('\n') + '\nenabled = false\n'
+    s = re.sub(r'(?m)^\[analytics\].*?(?=^\[|\Z)', fix_sec, s, flags=re.S, count=1)
+else:
+    s = s.rstrip('\n') + '\n\n[analytics]\nenabled = false\n'
+mm = re.search(r'(?m)^\[analytics\].*?(?=^\[|\Z)', s, flags=re.S)
+assert mm and re.search(r'(?m)^enabled\s*=\s*false', mm.group(0)), 'analytics-Patch schlug fehl'
+open(p, 'w').write(s)
+print('[LXC] [analytics] enabled = false gesetzt.')
+PYEOF
   # idempotent: laeuft der Stack schon, meldet die CLI "started" und exit 0
   npx --yes supabase start
   echo "[LXC] Supabase-Status + Keys auslesen ..."
